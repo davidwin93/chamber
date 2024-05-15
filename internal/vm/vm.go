@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"ondemand/internal/config"
+	"chamber/internal/config"
 	"os"
 	"os/exec"
 	"path/filepath"
