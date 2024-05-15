@@ -1,8 +1,9 @@
 package main
 
 import (
+	"chamber/internal/images"
+	"chamber/internal/server"
 	"log"
-	"ondemand/internal/server"
 	"sync"
 
 	"github.com/google/uuid"
@@ -23,6 +24,8 @@ type PortMap struct {
 const BUFFER_SIZE = 1024 * 64
 
 func main() {
+	log.Print(images.PullImage("hello-world"))
+
 	// Listen for incoming connections
 	alpineNginx := &VMData{
 		IP:    4,
