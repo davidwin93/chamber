@@ -33,7 +33,7 @@ func main() {
 	}
 	alpineSSH := &VMData{
 		IP:    5,
-		Drive: "./vm/alpine.ext4",
+		Drive: "./output.ext4",
 	}
 	portMappings := []*PortMap{
 		&PortMap{

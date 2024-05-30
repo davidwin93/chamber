@@ -3,4 +3,5 @@ chamber
 runner
 vm
 *.patch
+*.ext4
 snapshot

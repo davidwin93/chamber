@@ -3,7 +3,11 @@ package images
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 
+	"git.jakstys.lt/motiejus/undocker/rootfs"
+	"github.com/Microsoft/hcsshim/ext4/tar2ext4"
 	"github.com/containers/image/v5/copy"
 	"github.com/containers/image/v5/docker"
 	"github.com/containers/image/v5/signature"
@@ -13,7 +17,7 @@ import (
 )
 
 func PullImage(img string) error {
-	name, err := reference.ParseNamed("docker.io/library/alpine")
+	name, err := reference.ParseNamed("docker.io/davidwin/alpine")
 	if err != nil {
 		fmt.Println("Error creating policy context:", err)
 		return err
@@ -49,13 +53,38 @@ func PullImage(img string) error {
 		return err
 	}
 
+	os.Remove("./output.tar")
+
 	_, err = copy.Image(ctx, policyContext, destRef, srcRef, &copy.Options{RemoveSignatures: true})
 	if err != nil {
 		fmt.Println("Error copying image:", err)
 		return err
 	}
+	tarImage, err := os.Open("./output.tar")
+	if err != nil {
+		return err
+	}
+	tarFlatImage, err := os.Create("./output-flat.tar")
+	if err != nil {
+		return fmt.Errorf("create: %w", err)
+	}
+	defer tarFlatImage.Close()
+	defer tarImage.Close()
 
+	err = rootfs.Flatten(tarImage, tarFlatImage)
+	if err != nil {
+		return fmt.Errorf("create: %w", err)
+	}
+	ext4Output, err := os.Create("./output.ext4")
+	if err != nil {
+		return fmt.Errorf("create: %w", err)
+	}
+	defer ext4Output.Close()
+	var opts []tar2ext4.Option
+	tarFlatImage.Seek(0, io.SeekStart)
+	err = tar2ext4.Convert(tarFlatImage, ext4Output, opts...)
 	fmt.Println("Image successfully saved as tarball.")
+	_, _ = io.Copy(io.Discard, tarFlatImage)
 	return err
 }
 func getImageTags(ctx context.Context, sysCtx *types.SystemContext, repoRef reference.Named) ([]string, error) {
