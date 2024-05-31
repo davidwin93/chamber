@@ -4,4 +4,7 @@ runner
 vm
 *.patch
 *.ext4
+*.json
+init-runner
+log
 snapshot

@@ -3,6 +3,7 @@ module chamber
 go 1.22.0
 
 require (
+	git.jakstys.lt/motiejus/undocker v1.2.2
 	github.com/containers/image/v5 v5.30.1
 	github.com/distribution/reference v0.6.0
 	github.com/firecracker-microvm/firecracker-go-sdk v1.0.0
@@ -12,7 +13,6 @@ require (
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
-	git.jakstys.lt/motiejus/undocker v1.2.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect

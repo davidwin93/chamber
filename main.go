@@ -44,6 +44,13 @@ func main() {
 			VM:              alpineSSH,
 		},
 		&PortMap{
+			IncomingPort:    "8094",
+			DestinationPort: "80",
+			DestinationIP:   "172.102.0.5",
+			Protocol:        "tcp",
+			VM:              alpineSSH,
+		},
+		&PortMap{
 			IncomingPort:    "8092",
 			DestinationPort: "80",
 			DestinationIP:   "172.102.0.4",

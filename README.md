@@ -13,3 +13,7 @@ For simplicity we bundle a simple alpine OS with containerd and bootstrap docker
 * Refactor to add more configuration (VM resources, IP ranges, etc..)
 * Snapshot and hibernate VMs when they have been idling for some time.
 * Run VMs in Jailer
+
+
+## Support Docker Container natively 
+Read manifest.json -> grab config json -> grab config.cmd -> run as init in custom init script/golang runner.

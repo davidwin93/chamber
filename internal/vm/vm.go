@@ -58,7 +58,8 @@ type VMDefinition struct {
 }
 
 func NewVM(def *VMDefinition, config *config.Config) *ActiveVM {
-	bootArgs := "ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules random.trust_cpu=on i8042.noaux i8042.nomux i8042.nopnp i8042.nokbd init=/init "
+	//removed ro
+	bootArgs := "console=ttyS0 noapic reboot=k panic=1 pci=off nomodules random.trust_cpu=on i8042.noaux i8042.nomux i8042.nopnp i8042.nokbd init=/init-runner"
 	return &ActiveVM{
 		opts: &Options{
 			RootDrivePath:   def.RootDrive,
