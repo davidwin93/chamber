@@ -92,11 +92,11 @@ func (vm *ActiveVM) createMachine(ctx context.Context, snapshotOpt *snapshotOpt)
 
 	vmmCtx, vmmCancel := context.WithCancel(ctx)
 	vm.cancelCtx = vmmCancel
-	rootImagePath, err := copyImage(vm.opts.RootDrivePath)
-	vm.opts.RootDrivePath = rootImagePath
-	if err != nil {
-		return fmt.Errorf("Failed copying root path: %s", err)
-	}
+	//rootImagePath, err := copyImage(vm.opts.RootDrivePath)
+	//vm.opts.RootDrivePath = rootImagePath
+	// if err != nil {
+	// 	return fmt.Errorf("Failed copying root path: %s", err)
+	// }
 	fcCfg, err := vm.opts.getConfig()
 	//fcCfg, err := opts.getConfig(firecracker.SnapshotConfig{})
 	if err != nil {

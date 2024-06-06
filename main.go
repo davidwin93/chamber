@@ -11,7 +11,7 @@ import (
 
 type VMData struct {
 	IP    byte
-	Drive string
+	Image string
 }
 type PortMap struct {
 	IncomingPort    string
@@ -29,33 +29,20 @@ func main() {
 	// Listen for incoming connections
 	alpineNginx := &VMData{
 		IP:    4,
-		Drive: "./vm/alpine.ext4",
+		Image: "gotechnies/alpine-ssh",
 	}
 	alpineSSH := &VMData{
 		IP:    5,
-		Drive: "./output.ext4",
+		Image: "nginx",
 	}
 	portMappings := []*PortMap{
-		&PortMap{
-			IncomingPort:    "8091",
-			DestinationPort: "22",
-			DestinationIP:   "172.102.0.5",
-			Protocol:        "tcp",
-			VM:              alpineSSH,
-		},
+
 		&PortMap{
 			IncomingPort:    "8094",
 			DestinationPort: "80",
 			DestinationIP:   "172.102.0.5",
 			Protocol:        "tcp",
 			VM:              alpineSSH,
-		},
-		&PortMap{
-			IncomingPort:    "8092",
-			DestinationPort: "80",
-			DestinationIP:   "172.102.0.4",
-			Protocol:        "tcp",
-			VM:              alpineNginx,
 		},
 		&PortMap{
 			IncomingPort:    "8093",
@@ -70,10 +57,16 @@ func main() {
 		wg.Add(1)
 		go func(m *PortMap) {
 			defer wg.Done()
+			rootDrive, err := images.PullImage(m.VM.Image)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			log.Println(rootDrive, "has been created for", m.VM.Image)
 			srv := server.NewTCPServer(&AlpineVM{
 				id:     uuid.NewString(),
 				ip:     m.VM.IP,
-				drive:  m.VM.Drive,
+				drive:  rootDrive,
 				kernel: "./vm/vmlinux-6.1.0.bin",
 			}, m.IncomingPort, m.DestinationPort, m.DestinationIP)
 			log.Println(srv.Start())
