@@ -87,24 +87,19 @@ func PullImage(img string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("create: %w", err)
 	}
-	extRootOutput := fmt.Sprintf("./root-%s.ext4", imageID)
+	extRootOutput := fmt.Sprintf("./root-micro-%s.ext4", imageID)
 	ext4Output, err := os.Create(extRootOutput)
 	if err != nil {
 		return "", fmt.Errorf("create: %w", err)
 	}
 	defer ext4Output.Close()
 
-	//var opts []tar2ext4.Option
-	tarFlatImage.Seek(0, io.SeekStart)
 	tarFlatImage.Close()
-	_, err = createExt4(tarFlatImage, extRootOutput)
-	// err = tar2ext4.Convert(tarFlatImage, ext4Output, opts...)
-	// if err != nil {
-	// 	return "", fmt.Errorf("create: %w", err)
-	// }
+	_, err = createExt4(tarFlatImage.Name(), extRootOutput)
+	if err != nil {
+		return "", err
+	}
 	fmt.Println("Image successfully saved as tarball.")
-	_, _ = io.Copy(io.Discard, tarFlatImage)
-	//_, err = createOverlay("./output.ext4")
 	return extRootOutput, err
 }
 
@@ -112,18 +107,18 @@ type commandJSON struct {
 	Command []string `json:"command"`
 }
 
-func createOverlay(sourcePathExt4 string) (string, error) {
+func createOverlay(sourcePathExt4 string, overlayPath string, imageID string) (string, error) {
 	loopBaseDev, err := exec.Command("losetup", "--find", "--show", "--read-only", sourcePathExt4).Output()
 	if err != nil {
 		return "", err
 	}
 	loopBaseDevStr := string(bytes.TrimSpace(loopBaseDev))
 	log.Println(loopBaseDevStr)
-	err = exec.Command("fallocate", "-l", "5G", "./output-overlay.ext4").Run()
+	err = exec.Command("fallocate", "-l", "5G", overlayPath).Run()
 	if err != nil {
 		return "", err
 	}
-	overlayRawDev, err := exec.Command("losetup", "--find", "--show", "./output-overlay.ext4").Output()
+	overlayRawDev, err := exec.Command("losetup", "--find", "--show", overlayPath).Output()
 	if err != nil {
 		return "", err
 	}
@@ -151,7 +146,7 @@ func createOverlay(sourcePathExt4 string) (string, error) {
 		return "", err
 	}
 	dmFile.Close()
-	output, err := exec.Command("dmsetup", "create", "base-output", dmFile.Name()).CombinedOutput()
+	output, err := exec.Command("dmsetup", "create", fmt.Sprintf("base-%s", imageID), dmFile.Name()).CombinedOutput()
 	log.Println(string(output))
 	if err != nil {
 		return "", err
@@ -161,14 +156,14 @@ func createOverlay(sourcePathExt4 string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	overlayStdin.Write([]byte(fmt.Sprintf(`0 %s snapshot /dev/mapper/base-output %s P 8`, overlaySize, overlayRawDevStr)))
-	overlayDM := exec.Command("dmsetup", "create", "overlay-output", overlayStdin.Name())
+	overlayStdin.Write([]byte(fmt.Sprintf(`0 %s snapshot /dev/mapper/%s %s P 8`, overlaySize, fmt.Sprintf("base-%s", imageID), overlayRawDevStr)))
+	overlayDM := exec.Command("dmsetup", "create", fmt.Sprintf("overlay-%s", imageID), overlayStdin.Name())
 	output, err = overlayDM.CombinedOutput()
 	log.Println(string(output))
 	if err != nil {
 		return "", err
 	}
-	return "", nil
+	return fmt.Sprintf("/dev/mapper/overlay-%s", imageID), nil
 }
 func flattenDockerTar(dockerTarFile, outputFlatFile string) (*os.File, error) {
 
@@ -270,7 +265,7 @@ func injectBinary(tarFlatImage *os.File, cmd commandJSON, binaryPath string) err
 	tw.Close()
 	return nil
 }
-func createExt4(input *os.File, outputFile string) (string, error) {
+func createExt4(inputPath string, outputFile string) (string, error) {
 	err := exec.Command("fallocate", "-l", "2G", outputFile).Run()
 	if err != nil {
 		return "", err
@@ -287,7 +282,7 @@ func createExt4(input *os.File, outputFile string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = exec.Command("tar", "-xf", input.Name(), "-C", tmpDir).Run()
+	err = exec.Command("tar", "-xf", inputPath, "-C", tmpDir).Run()
 	if err != nil {
 		return "", err
 	}
