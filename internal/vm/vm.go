@@ -3,10 +3,12 @@ package vm
 import (
 	"chamber/internal/config"
 	"context"
+	secure "crypto/rand"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
@@ -24,7 +26,7 @@ type VMConfig struct {
 type Options struct {
 	Id string `long:"id" description:"Jailer VMM id"`
 	// maybe make this an int instead
-	IpId            byte   `byte:"id" description:"an ip we use to generate an ip address"`
+	IP              string `sdtring:"ip" description:"an ip we use to generate an ip address"`
 	FcBinary        string `long:"firecracker-binary" description:"Path to firecracker binary"`
 	FcKernelCmdLine string `long:"kernel-opts" description:"Kernel commandline"`
 	RootDrivePath   string `long:"root-drive-path" description:"Root Drive Path"`
@@ -54,24 +56,46 @@ type VMDefinition struct {
 	RootDrive  string
 	KernelPath string
 	ID         string
-	IPByte     byte
+	IP         string
+}
+
+const (
+	local     = 0b10
+	multicast = 0b1
+)
+
+func generateMacAddress() string {
+	buf := make([]byte, 6)
+	_, err := secure.Read(buf)
+	if err != nil {
+		fmt.Println("error:", err)
+		return ""
+	}
+	// clear multicast bit (&^), ensure local bit (|)
+	buf[0] = buf[0]&^multicast | local
+	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 }
 
 func NewVM(def *VMDefinition, config *config.Config) *ActiveVM {
 	//removed ro
 	bootArgs := "console=ttyS0 noapic reboot=k panic=1 pci=off nomodules random.trust_cpu=on i8042.noaux i8042.nomux i8042.nopnp i8042.nokbd init=/init-runner"
+	macAddress := generateMacAddress()
+	if macAddress == "" {
+		log.Fatal("could not create mac address")
+	}
+	unqiueID := rand.Intn(99999-10+1) + 10
 	return &ActiveVM{
 		opts: &Options{
 			RootDrivePath:   def.RootDrive,
 			KernelPath:      def.KernelPath,
-			IpId:            def.IPByte,
+			IP:              def.IP,
 			Id:              def.ID,
 			FcBinary:        config.FirecrackerBinaryPath,
 			FcKernelCmdLine: bootArgs,
-			FcSocketPath:    fmt.Sprintf("/tmp/firecracker-%d.sock", def.IPByte),
-			TapMacAddr:      fmt.Sprintf("02:FC:00:00:00:%02x", def.IPByte),
-			TapDev:          fmt.Sprintf("fc-tap-%d", def.IPByte),
-			FcIP:            net.IPv4(172, 102, 0, def.IPByte).String(),
+			FcSocketPath:    fmt.Sprintf("/tmp/firecracker-%d.sock", unqiueID),
+			TapMacAddr:      macAddress,
+			TapDev:          fmt.Sprintf("fc-%d", unqiueID),
+			FcIP:            def.IP,
 			FcCPUCount:      1,
 			FcMemSz:         512,
 		},
@@ -167,9 +191,9 @@ func (opts *Options) getConfig() (*firecracker.Config, error) {
 			IsReadOnly:   firecracker.Bool(false),
 		},
 	}
-	fc_ip := net.IPv4(172, 102, 0, opts.IpId)
+	fc_ip := net.ParseIP(opts.IP)
 	//gateway_ip := "172.102.0.1"
-	docker_mask_long := "255.255.255.0"
+	docker_mask_long := "255.255.0.0"
 	return &firecracker.Config{
 		VMID:            opts.Id,
 		SocketPath:      opts.FcSocketPath,
@@ -182,7 +206,7 @@ func (opts *Options) getConfig() (*firecracker.Config, error) {
 					MacAddress:  opts.TapMacAddr,
 					HostDevName: opts.TapDev,
 					IPConfiguration: &firecracker.IPConfiguration{
-						IPAddr:  net.IPNet{fc_ip, net.IPMask(docker_mask_long)},
+						IPAddr:  net.IPNet{IP: fc_ip, Mask: net.IPMask(docker_mask_long)},
 						Gateway: net.IPv4(172, 102, 0, 1),
 						IfName:  "eth0",
 					},

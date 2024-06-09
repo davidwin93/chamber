@@ -15,7 +15,7 @@ import (
 )
 
 type VMConfig interface {
-	GetIPByte() byte
+	GetIP() string
 	GetKernelImage() string
 	GetRootDrive() string
 	GetID() string
@@ -76,7 +76,7 @@ func (t *TCPServer) handleClient(conn net.Conn) {
 	outerConn, err := net.DialTimeout("tcp", net.JoinHostPort(t.GetDestinationIP(), t.GetDestinationPort()), timeout)
 	if err != nil {
 		fmt.Println("Connecting error:", err)
-		vm := vm.NewVM(&vm.VMDefinition{IPByte: t.vm.GetIPByte(), ID: t.vm.GetID(), KernelPath: t.vm.GetKernelImage(), RootDrive: t.vm.GetRootDrive()}, config.LoadDefaultConfig())
+		vm := vm.NewVM(&vm.VMDefinition{IP: t.vm.GetIP(), ID: t.vm.GetID(), KernelPath: t.vm.GetKernelImage(), RootDrive: t.vm.GetRootDrive()}, config.LoadDefaultConfig())
 		err = vm.StartNewMachine(context.Background())
 		if err != nil {
 			fmt.Print(err)
