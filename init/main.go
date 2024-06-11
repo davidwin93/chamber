@@ -8,6 +8,12 @@ import (
 	"os/exec"
 )
 
+type nullReader struct{}
+type nullWriter struct{}
+
+func (nullReader) Read(p []byte) (n int, err error)  { return len(p), nil }
+func (nullWriter) Write(p []byte) (n int, err error) { return len(p), nil }
+
 func main() {
 	// write hello world to /test.txt
 	test, err := os.Create("/test.txt")
@@ -39,6 +45,7 @@ func main() {
 			cmd := exec.Command(config["command"][0])
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
+			cmd.Stdin = nullReader{}
 			err = cmd.Run()
 			if err != nil {
 				log.Fatal(err)
@@ -48,6 +55,7 @@ func main() {
 
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
+			cmd.Stdin = nullReader{}
 			err = cmd.Run()
 			if err != nil {
 				log.Fatal(err)
