@@ -193,7 +193,7 @@ func (opts *Options) getConfig() (*firecracker.Config, error) {
 	}
 	fc_ip := net.ParseIP(opts.IP)
 	//gateway_ip := "172.102.0.1"
-	docker_mask_long := "255.255.0.0"
+	docker_mask_long := config.GetConfig().SubnetMask
 	return &firecracker.Config{
 		VMID:            opts.Id,
 		SocketPath:      opts.FcSocketPath,
@@ -207,7 +207,7 @@ func (opts *Options) getConfig() (*firecracker.Config, error) {
 					HostDevName: opts.TapDev,
 					IPConfiguration: &firecracker.IPConfiguration{
 						IPAddr:  net.IPNet{IP: fc_ip, Mask: net.IPMask(docker_mask_long)},
-						Gateway: net.IPv4(172, 102, 0, 1),
+						Gateway: config.GetConfig().GatewayIP,
 						IfName:  "eth0",
 					},
 				},

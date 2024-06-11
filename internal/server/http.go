@@ -56,11 +56,15 @@ func (api *APIServer) StartAPIServer(port string) error {
 	api.allocatedPorts = make(map[int]struct{})
 	api.activeServers = make(map[string]*ActiveServer)
 
-	http.HandleFunc("/create", api.createVM)
+	http.HandleFunc("/vm", api.createVM)
+	log.Println("Starting API server on port", port)
 	return http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 }
 func (api *APIServer) createVM(w http.ResponseWriter, r *http.Request) {
-
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
 	var workload Workload
 	err := json.NewDecoder(r.Body).Decode(&workload)
 	if err != nil {
@@ -68,9 +72,10 @@ func (api *APIServer) createVM(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	log.Println("Creating VM for", workload.Name)
 	ip := api.getUnusedIP()
 	port := api.getUnusedPort()
-
+	log.Println("Using IP", ip, "and port", port)
 	rootDrive, err := images.PullImage(workload.Image)
 	if err != nil {
 		log.Println(err)
@@ -78,6 +83,7 @@ func (api *APIServer) createVM(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println(rootDrive, "has been created for", workload.Image)
 	id := uuid.NewString()
+
 	srv := NewTCPServer(&GenericVM{
 		id:     id,
 		ip:     ip,
@@ -92,7 +98,7 @@ func (api *APIServer) createVM(w http.ResponseWriter, r *http.Request) {
 		log.Println(srv.Start())
 	}()
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(&VMStatus{ID: id, Port: port})
+	err = json.NewEncoder(w).Encode(&VMStatus{ID: id, Port: port, Name: workload.Name})
 	if err != nil {
 		log.Println(err)
 	}
@@ -101,6 +107,7 @@ func (api *APIServer) createVM(w http.ResponseWriter, r *http.Request) {
 type VMStatus struct {
 	ID   string `json:"id"`
 	Port string `json:"port"`
+	Name string `json:"name"`
 }
 
 func (api *APIServer) getUnusedIP() string {
