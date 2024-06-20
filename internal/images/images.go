@@ -23,7 +23,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func PullImage(img string) (string, error) {
+func PullImage(img string, extraEnv []string) (string, error) {
 	imageID := uuid.NewString()
 	var name reference.Named
 	var err error
@@ -68,12 +68,12 @@ func PullImage(img string) (string, error) {
 		return "", err
 	}
 
-	command, err := getCommandArgs(fmt.Sprintf("./%s.tar", imageID))
+	cmd, err := getCommandArgs(fmt.Sprintf("./%s.tar", imageID))
 	if err != nil {
 		log.Println(err)
 	}
-	log.Println(command)
-	cmd := commandJSON{Command: command}
+	log.Println(cmd)
+	cmd.Env = append(cmd.Env, extraEnv...)
 	log.Println("Flattening image")
 	tarFlatImage, err := flattenDockerTar(fmt.Sprintf("./%s.tar", imageID), fmt.Sprintf("./%s-flat.tar", imageID))
 	if err != nil {
@@ -83,7 +83,7 @@ func PullImage(img string) (string, error) {
 
 	tarFlatImage.Seek(0, io.SeekStart)
 	log.Println("Injecting binary")
-	err = injectBinary(tarFlatImage, cmd, "./init-runner")
+	err = injectBinary(tarFlatImage, *cmd, "./init-runner")
 	if err != nil {
 		return "", fmt.Errorf("create: %w", err)
 	}
@@ -105,6 +105,7 @@ func PullImage(img string) (string, error) {
 
 type commandJSON struct {
 	Command []string `json:"command"`
+	Env     []string `json:"env"`
 }
 
 func createOverlay(sourcePathExt4 string, overlayPath string, imageID string) (string, error) {
@@ -310,7 +311,7 @@ func getImageTags(ctx context.Context, sysCtx *types.SystemContext, repoRef refe
 	return tags, nil
 }
 
-func getCommandArgs(dockerTar string) ([]string, error) {
+func getCommandArgs(dockerTar string) (*commandJSON, error) {
 	data, err := os.Open(dockerTar)
 	if err != nil {
 		return nil, err
@@ -321,7 +322,7 @@ func getCommandArgs(dockerTar string) ([]string, error) {
 	err = json.NewDecoder(tr).Decode(&config)
 	if err != nil {
 		log.Println(err)
-		return output, err
+		return &commandJSON{Command: output}, err
 	}
 	log.Println(config[0]["Config"])
 	data.Seek(0, io.SeekStart)
@@ -330,24 +331,28 @@ func getCommandArgs(dockerTar string) ([]string, error) {
 	err = json.NewDecoder(tr).Decode(&cmdData)
 	if err != nil {
 		log.Println(err)
-		return output, err
+		return &commandJSON{Command: output}, err
 	}
 	configExtract := cmdData["config"]
 	log.Println(configExtract)
 	if configExtract == nil {
-		return output, errors.New("config not found")
+		return &commandJSON{Command: output}, errors.New("config not found")
 	}
 	cmdExtract := configExtract.(map[string]any)["Cmd"]
 	if cmdExtract == nil {
-		return output, errors.New("cmd not found")
+		return &commandJSON{Command: output}, errors.New("cmd not found")
+	}
+	envExtract := configExtract.(map[string]any)["Env"]
+	if envExtract == nil {
+		envExtract = []any{}
 	}
 	entryPoint := configExtract.(map[string]any)["Entrypoint"]
 	log.Println(configExtract.(map[string]any)["User"])
 	if entryPoint != nil {
-		return append(convertAnyToString(entryPoint.([]any)), convertAnyToString(cmdExtract.([]any))...), nil
+		return &commandJSON{Env: convertAnyToString(envExtract.([]any)), Command: append(convertAnyToString(entryPoint.([]any)), convertAnyToString(cmdExtract.([]any))...)}, nil
 	}
 	output = convertAnyToString(cmdExtract.([]any))
-	return output, nil
+	return &commandJSON{Env: convertAnyToString(envExtract.([]any)), Command: output}, nil
 }
 func findFile(name string, data io.Reader) io.Reader {
 	tr := tar.NewReader(data)
