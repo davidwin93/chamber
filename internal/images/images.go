@@ -73,7 +73,9 @@ func PullImage(img string, extraEnv []string) (string, error) {
 		log.Println(err)
 	}
 	log.Println(cmd)
-	cmd.Env = append(cmd.Env, extraEnv...)
+	if extraEnv != nil {
+		cmd.Env = append(cmd.Env, extraEnv...)
+	}
 	log.Println("Flattening image")
 	tarFlatImage, err := flattenDockerTar(fmt.Sprintf("./%s.tar", imageID), fmt.Sprintf("./%s-flat.tar", imageID))
 	if err != nil {

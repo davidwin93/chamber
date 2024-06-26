@@ -22,10 +22,11 @@ type APIServer struct {
 }
 
 type Workload struct {
-	Name            string `json:"name"`
-	Image           string `json:"image"`
-	DestinationPort string `json:"dstPort"`
-	Protocol        string `json:"protocol"`
+	Name            string   `json:"name"`
+	Image           string   `json:"image"`
+	DestinationPort string   `json:"dstPort"`
+	Protocol        string   `json:"protocol"`
+	Env             []string `json:"env"`
 }
 
 type GenericVM struct {
@@ -76,7 +77,7 @@ func (api *APIServer) createVM(w http.ResponseWriter, r *http.Request) {
 	ip := api.getUnusedIP()
 	port := api.getUnusedPort()
 	log.Println("Using IP", ip, "and port", port)
-	rootDrive, err := images.PullImage(workload.Image)
+	rootDrive, err := images.PullImage(workload.Image, workload.Env)
 	if err != nil {
 		log.Println(err)
 		return
