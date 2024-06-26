@@ -13,3 +13,7 @@ e2e: build
 
 .PHONY: all
 all: e2e run
+
+.PHONY: network
+network:
+	sudo ip link add name firecracker0 type bridge && sudo ip addr add 172.102.0.1/16 dev firecracker0 && sudo ip link set dev firecracker0 up
