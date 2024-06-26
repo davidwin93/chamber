@@ -2,11 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 type nullReader struct{}
@@ -27,35 +30,15 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, World!"))
 	})
-	err = exec.Command("/bin/mount", "-t", "proc", "proc", "/proc").Run()
+	err = prepEnv()
 	if err != nil {
-		log.Fatal("could not mount proc", err)
+		log.Println(err)
 	}
-	err = exec.Command("/bin/mount", "-t", "sysfs", "none", "/sys").Run()
-	if err != nil {
-		log.Fatal("could not mount sys", err)
-	}
-	err = exec.Command("/bin/mkdir", "-p", "/dev/pts").Run()
-	if err != nil {
-		log.Fatal("could not create dev/pts", err)
-	}
-	devMnt := exec.Command("/bin/mount", "-t", "devpts", "devpts", "/dev/pts")
-	devMnt.Stderr = os.Stderr
-	devMnt.Stdout = os.Stdout
-	devMnt.Stdin = nullReader{}
-	err = devMnt.Run()
-	if err != nil {
-		log.Fatal("could not mount dev", err)
-	}
-	linkFD := exec.Command("/bin/ln", "-s", "/proc/self/fd", "/dev/fd")
-	linkFD.Stderr = os.Stderr
-	linkFD.Stdout = os.Stdout
-	linkFD.Stdin = nullReader{}
-	err = linkFD.Run()
-	if err != nil {
-		log.Fatal("could not mount dev", err)
-	}
-
+	// exec.Command("/bin/mkdir", "-p", "/dev/null").Run()
+	// err = exec.Command("/bin/mknod", "-m", "0666", "/dev/null", "c", "1", "3").Run()
+	// if err != nil {
+	// 	log.Fatal("could not create /dev/null", err)
+	// }
 	go func() {
 
 		file, err := os.Open("/command.json")
@@ -102,4 +85,36 @@ func main() {
 		}
 	}()
 	log.Fatal(http.ListenAndServe(":2222", nil))
+}
+func prepEnv() error {
+
+	os.MkdirAll("/dev/pts", 0755)
+	os.MkdirAll("/proc", 0755)
+	os.MkdirAll("/sys", 0755)
+	err := unix.Mknod("/dev/null", 1, 3)
+	if err != nil {
+		log.Println("could not crate null %w", err)
+	}
+	unix.Mount("devtmpfs", "/dev", "devtmpfs", 0, "")
+	//exec.Command("/bin/mount", "-t", "devtmpfs", "devtmpfs", "/dev").Run()
+	err = unix.Mount("proc", "/proc", "proc", 0, "")
+	// err = exec.Command("/bin/mount", "-t", "proc", "proc", "/proc").Run()
+	if err != nil {
+		return fmt.Errorf("could not mount proc %w", err)
+	}
+	err = unix.Mount("sysfs", "/sys", "sysfs", 0, "")
+	if err != nil {
+		return fmt.Errorf("could not mount sys %w", err)
+	}
+
+	err = unix.Mount("devpts", "/dev/pts", "devpts", 0, "")
+	if err != nil {
+		return fmt.Errorf("could not mount devpts %w", err)
+	}
+
+	err = unix.Symlink("/proc/self/fd", "/dev/fd")
+	if err != nil {
+		return fmt.Errorf("could not mount dev %w", err)
+	}
+	return nil
 }
