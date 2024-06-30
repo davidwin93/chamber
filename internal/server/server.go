@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sethvargo/go-retry"
@@ -27,10 +28,11 @@ type ProxyServer interface {
 	Start() error
 }
 type TCPServer struct {
-	srcPort string
-	dstPort string
-	dstIP   string
-	vm      VMConfig
+	srcPort               string
+	dstPort               string
+	dstIP                 string
+	vm                    VMConfig
+	lastObservedTimestamp int64
 }
 
 func NewTCPServer(vmConfig VMConfig, srcPort, dstPort, dstIP string) *TCPServer {
@@ -106,14 +108,33 @@ func (t *TCPServer) handleClient(conn net.Conn) {
 	log.Println("Connection established")
 	var wg sync.WaitGroup
 	wg.Add(2)
+	progressCon := NewProgressWrapper(conn, &t.lastObservedTimestamp)
+	progressOut := NewProgressWrapper(outerConn, &t.lastObservedTimestamp)
 	go func() {
 		defer wg.Done()
-		io.Copy(outerConn, conn)
+		io.Copy(outerConn, progressCon)
 	}()
 	go func() {
 		defer wg.Done()
-		io.Copy(conn, outerConn)
+		io.Copy(conn, progressOut)
 	}()
 	wg.Wait()
 	log.Println("Connection closed")
+}
+
+type ProgressWrapper struct {
+	addr *int64
+	r    io.Reader
+}
+
+func NewProgressWrapper(reader io.Reader, addr *int64) *ProgressWrapper {
+	return &ProgressWrapper{
+		addr: addr,
+		r:    reader,
+	}
+}
+func (p *ProgressWrapper) Read(b []byte) (n int, err error) {
+	n, err = p.r.Read(b)
+	atomic.StoreInt64(p.addr, time.Now().Unix())
+	return
 }

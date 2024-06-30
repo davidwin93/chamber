@@ -22,11 +22,12 @@ type APIServer struct {
 }
 
 type Workload struct {
-	Name            string   `json:"name"`
-	Image           string   `json:"image"`
-	DestinationPort string   `json:"dstPort"`
-	Protocol        string   `json:"protocol"`
-	Env             []string `json:"env"`
+	Name               string   `json:"name"`
+	Image              string   `json:"image"`
+	DestinationPort    string   `json:"dstPort"`
+	Protocol           string   `json:"protocol"`
+	Env                []string `json:"env"`
+	IdleTimeOutSeconds int      `json:"idleTimeout"`
 }
 
 type GenericVM struct {
