@@ -158,6 +158,7 @@ func (vm *ActiveVM) createMachine(ctx context.Context, snapshotOpt *snapshotOpt)
 
 	inf, err := m.DescribeInstanceInfo(vmmCtx)
 	fmt.Printf("%+v", *inf.State)
+	vm.machine = m
 	return nil
 }
 func (vm *ActiveVM) configureNetwork() error {
@@ -253,4 +254,15 @@ func copyImage(src string) (string, error) {
 	defer destination.Close()
 	_, err = io.Copy(destination, source)
 	return destination.Name(), err
+}
+func (vm *ActiveVM) ShutdownAndSnapshot(memDumpPath string, statePath string) error {
+	err := vm.machine.Shutdown(context.Background())
+	if err != nil {
+		log.Println(err)
+		err = vm.machine.StopVMM()
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	return vm.machine.CreateSnapshot(context.Background(), memDumpPath, statePath)
 }

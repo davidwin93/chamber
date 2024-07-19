@@ -17,3 +17,7 @@ all: e2e run
 .PHONY: network
 network:
 	sudo ip link add name firecracker0 type bridge && sudo ip addr add 172.102.0.1/16 dev firecracker0 && sudo ip link set dev firecracker0 up
+
+.PHONY: test-instances
+test-instances:
+	curl --header "Content-Type: application/json" --request POST --data '{"name":"go-httpbin","image":"mccutchen/go-httpbin","dstPort":"8080","protocol":"tcp"}' http://localhost:8070/vm

@@ -32,6 +32,7 @@ type TCPServer struct {
 	dstPort               string
 	dstIP                 string
 	vm                    VMConfig
+	machine               *vm.ActiveVM
 	lastObservedTimestamp int64
 }
 
@@ -67,7 +68,7 @@ func (t *TCPServer) Start() error {
 		if err != nil {
 			continue
 		}
-
+		conn.SetDeadline(time.Now().Add(10 * time.Second))
 		// Handle client connection in a goroutine
 		go t.handleClient(conn)
 	}
@@ -78,13 +79,14 @@ func (t *TCPServer) handleClient(conn net.Conn) {
 	outerConn, err := net.DialTimeout("tcp", net.JoinHostPort(t.GetDestinationIP(), t.GetDestinationPort()), timeout)
 	if err != nil {
 		fmt.Println("Connecting error:", err)
-		vm := vm.NewVM(&vm.VMDefinition{IP: t.vm.GetIP(), ID: t.vm.GetID(), KernelPath: t.vm.GetKernelImage(), RootDrive: t.vm.GetRootDrive()}, config.LoadDefaultConfig())
-		err = vm.StartNewMachine(context.Background())
+		machine := vm.NewVM(&vm.VMDefinition{IP: t.vm.GetIP(), ID: t.vm.GetID(), KernelPath: t.vm.GetKernelImage(), RootDrive: t.vm.GetRootDrive()}, config.LoadDefaultConfig())
+		err = machine.StartNewMachine(context.Background())
 		if err != nil {
 			fmt.Print(err)
 			return
 		}
 		fmt.Println("VM created")
+		t.machine = machine
 		b := retry.NewConstant(500 * time.Millisecond)
 		b = retry.WithMaxRetries(10, b)
 		err = retry.Do(context.Background(), b, func(ctx context.Context) error {
@@ -119,7 +121,13 @@ func (t *TCPServer) handleClient(conn net.Conn) {
 		io.Copy(conn, progressOut)
 	}()
 	wg.Wait()
-	log.Println("Connection closed")
+	log.Println("Connection closed. Starting snapshot")
+	// need to hanlde multiple connections to VM since 1 terminating shouldn't cause the VM to be stopped
+	err = t.machine.ShutdownAndSnapshot(fmt.Sprintf("./mem-snapshot-%s.snapshot", t.vm.GetID()), fmt.Sprintf("./config-%s.snapshot", t.vm.GetID()))
+	if err != nil {
+		log.Println("Error in snapshotting", err)
+
+	}
 }
 
 type ProgressWrapper struct {
@@ -137,4 +145,7 @@ func (p *ProgressWrapper) Read(b []byte) (n int, err error) {
 	n, err = p.r.Read(b)
 	atomic.StoreInt64(p.addr, time.Now().Unix())
 	return
+}
+func (p *ProgressWrapper) GetIdleTime() time.Duration {
+	return time.Since(time.Unix(atomic.LoadInt64(p.addr), 0))
 }
